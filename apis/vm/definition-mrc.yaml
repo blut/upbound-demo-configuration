@@ -1,0 +1,48 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata: 
+  name: xvmconfigs.azure.test.com
+spec: 
+  group: azure.test.com
+  names:
+    kind: xVmConfig
+    plural: xvmconfigs
+  claimNames:
+    kind: VmConfig
+    plural: vmconfigs
+  versions:
+    - name: v1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object 
+          properties:
+            spec:
+              type: object
+              properties:
+                resourceGroup:
+                  type: string
+                vmName:
+                  type: string
+              required:
+                - resourceGroup
+                - vmName
+            status:
+              type: object
+              properties:
+                command:
+                  type: object
+                  properties:
+                    errorMessage:
+                      type: string
+                    executionMessage:
+                      type: string
+                    executionState:
+                      type: string
+                    exitCode:
+                      type: number
+                    output:
+                      type: string
+  enforcedCompositionRef:
+    name: vm-config

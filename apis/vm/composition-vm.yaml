@@ -1,0 +1,168 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: azure-linux-vm
+spec:
+  compositeTypeRef:
+    apiVersion: azure.test.com/v1
+    kind: xVm
+  patchSets:
+  - name: provider-config
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.claimRef.namespace
+      toFieldPath: spec.providerConfigRef.name
+  - name: resource-group
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.resourceGroup
+      toFieldPath: spec.forProvider.resourceGroupName
+  resources:
+  ### PublicIp ###
+    - name: public-ip
+      patches:
+        - type: PatchSet
+          patchSetName: provider-config
+        - type: PatchSet
+          patchSetName: resource-group
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.id
+          toFieldPath: spec.publicIpId
+      base:
+        apiVersion: network.azure.upbound.io/v1beta1
+        kind: PublicIP
+        spec:
+          providerConfigRef:
+            name:
+          forProvider:
+            allocationMethod: Dynamic
+            location: West Europe
+            resourceGroupName: 
+  ### NIC ###
+    - name: network-interface
+      patches:
+        - type: PatchSet
+          patchSetName: provider-config
+        - type: PatchSet
+          patchSetName: resource-group
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.publicIpId
+          toFieldPath: spec.forProvider.ipConfiguration[0].publicIpAddressId
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.claimRef.namespace
+              - fromFieldPath: spec.resourceGroup
+              - fromFieldPath: spec.virtualNetwork
+              - fromFieldPath: spec.subnet
+            strategy: string
+            string:
+              fmt: "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks/%s/subnets/%s"
+          toFieldPath: spec.forProvider.ipConfiguration[0].subnetId
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.id
+          toFieldPath: spec.nicId
+      base:
+        apiVersion: network.azure.upbound.io/v1beta1
+        kind: NetworkInterface
+        spec:
+          providerConfigRef:
+            name:
+          forProvider:
+            ipConfiguration:
+            - name: ipConfig
+              privateIpAddressAllocation: Dynamic
+              publicIpAddressId:
+              subnetId: 
+            location: West Europe
+            resourceGroupName:
+    ### VM ###
+    - name: virtual-machine
+      base:
+        apiVersion: compute.azure.upbound.io/v1beta1
+        kind: LinuxVirtualMachine
+        spec:
+          providerConfigRef:
+            name:
+          forProvider:
+            adminSshKey:
+            - publicKey:
+              username: adminuser
+            adminUsername: adminuser
+            location: West Europe
+            osDisk:
+            - caching: ReadWrite
+              storageAccountType: Standard_LRS
+            size: Standard_B1ls
+            sourceImageReference:
+            networkInterfaceIdsSelector:
+              matchControllerRef: true
+            resourceGroupName:
+      readinessChecks:
+        - type: NonEmpty
+          fieldPath: status.atProvider
+      patches:
+        - type: PatchSet
+          patchSetName: provider-config
+        - type: PatchSet
+          patchSetName: resource-group
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.publicKey
+          toFieldPath: spec.forProvider.adminSshKey[0].publicKey
+          policy:
+            fromFieldPath: Required
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.sourceImageRef
+          toFieldPath: spec.forProvider.sourceImageReference
+          policy:
+            fromFieldPath: Required
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.id
+          toFieldPath: spec.vmId
+    # ### Configuration ###
+    # - name: virtual-machine-config
+    #   base:
+    #     apiVersion: compute.azure.upbound.io/v1beta1
+    #     kind: VirtualMachineRunCommand
+    #     spec:
+    #       providerConfigRef:
+    #         name: 
+    #       forProvider:
+    #         location: West Europe
+    #         virtualMachineId: 
+    #         source:
+    #         - script: |
+    #             echo "Apply initial VM configuration."
+    #   patches:
+    #     - type: PatchSet
+    #       patchSetName: provider-config
+    #     - type: FromCompositeFieldPath
+    #       fromFieldPath: spec.vmId
+    #       toFieldPath: spec.forProvider.virtualMachineId
+    #       policy:
+    #         fromFieldPath: Required
+    #     - type: ToCompositeFieldPath
+    #       fromFieldPath: status.atProvider.instanceView[0].errorMessage
+    #       toFieldPath: status.command.errorMessage
+    #       policy:
+    #         fromFieldPath: Required
+    #     - type: ToCompositeFieldPath
+    #       fromFieldPath: status.atProvider.instanceView[0].executionMessage
+    #       toFieldPath: status.command.executionMessage
+    #       policy:
+    #         fromFieldPath: Required
+    #     - type: ToCompositeFieldPath
+    #       fromFieldPath: status.atProvider.instanceView[0].executionState
+    #       toFieldPath: status.command.executionState
+    #       policy:
+    #         fromFieldPath: Required
+    #     - type: ToCompositeFieldPath
+    #       fromFieldPath: status.atProvider.instanceView[0].exitCode
+    #       toFieldPath: status.command.exitCode
+    #       policy:
+    #         fromFieldPath: Required
+    #     - type: ToCompositeFieldPath
+    #       fromFieldPath: status.atProvider.instanceView[0].output
+    #       toFieldPath: status.command.output
+    #       policy:
+    #         fromFieldPath: Required

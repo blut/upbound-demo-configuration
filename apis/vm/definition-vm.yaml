@@ -1,0 +1,78 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata: 
+  name: xvms.azure.test.com
+spec:
+  group: azure.test.com
+  names:
+    kind: xVm
+    plural: xvms
+  claimNames:
+    kind: Vm
+    plural: vms
+  versions:
+    - name: v1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object 
+          properties:
+            spec:
+              type: object
+              properties:
+                resourceGroup:
+                  type: string
+                virtualNetwork:
+                  type: string
+                subnet:
+                  type: string
+                publicKey:
+                  type: string
+                publicIpId:
+                  type: string
+                nicId:
+                  type: string
+                vmId:
+                  type: string
+                sourceImageRef:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      offer:
+                        type: string
+                      publisher:
+                        type: string
+                      sku:
+                        type: string
+                      version:
+                        type: string
+                    required:
+                    - offer
+                    - publisher
+                    - sku
+                    - version
+              required:
+                - resourceGroup
+                - virtualNetwork
+                - subnet
+                - publicKey
+            # status:
+            #   type: object
+            #   properties:
+            #     command:
+            #       type: object
+            #       properties:
+            #         errorMessage:
+            #           type: string
+            #         executionMessage:
+            #           type: string
+            #         executionState:
+            #           type: string
+            #         exitCode:
+            #           type: number
+            #         output:
+            #           type: string
+  enforcedCompositionRef:
+    name: azure-linux-vm

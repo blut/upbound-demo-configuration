@@ -1,0 +1,76 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: vm-config
+spec:
+  compositeTypeRef:
+    apiVersion: azure.test.com/v1
+    kind: xVmConfig
+  patchSets:
+  - name: provider-config
+    patches:
+      - type: FromCompositeFieldPath
+        fromFieldPath: spec.claimRef.namespace
+        toFieldPath: spec.providerConfigRef.name
+        policy:
+          fromFieldPath: Required
+  - name: vm-id
+    patches:
+      - type: CombineFromComposite
+        combine:
+          variables:
+            - fromFieldPath: spec.claimRef.namespace
+            - fromFieldPath: spec.resourceGroup
+            - fromFieldPath: spec.vmName
+          strategy: string
+          string:
+            fmt: "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s" 
+        toFieldPath: spec.forProvider.virtualMachineId
+  - name: command-status
+    patches:
+      - type: ToCompositeFieldPath
+        fromFieldPath: status.atProvider.instanceView[0].errorMessage
+        toFieldPath: status.command.errorMessage
+        policy:
+          fromFieldPath: Required
+      - type: ToCompositeFieldPath
+        fromFieldPath: status.atProvider.instanceView[0].executionMessage
+        toFieldPath: status.command.executionMessage
+        policy:
+          fromFieldPath: Required
+      - type: ToCompositeFieldPath
+        fromFieldPath: status.atProvider.instanceView[0].executionState
+        toFieldPath: status.command.executionState
+        policy:
+          fromFieldPath: Required
+      - type: ToCompositeFieldPath
+        fromFieldPath: status.atProvider.instanceView[0].exitCode
+        toFieldPath: status.command.exitCode
+        policy:
+          fromFieldPath: Required
+      - type: ToCompositeFieldPath
+        fromFieldPath: status.atProvider.instanceView[0].output
+        toFieldPath: status.command.output
+        policy:
+          fromFieldPath: Required
+  resources:
+    - name: vm-config
+      patches:
+        - type: PatchSet
+          patchSetName: provider-config
+        - type: PatchSet
+          patchSetName: vm-id
+        - type: PatchSet
+          patchSetName: command-status
+      base:
+        apiVersion: compute.azure.upbound.io/v1beta1
+        kind: VirtualMachineRunCommand
+        spec:
+          providerConfigRef:
+            name: 
+          forProvider:
+            location: West Europe
+            virtualMachineId:
+            source:
+            - script: |
+                echo "Apply later VM configuration."
